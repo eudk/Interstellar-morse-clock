@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interstellar Clock Message</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #000;
+            background-size: 10px 10px;
+            color: #fff;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #fff;
+            background-color: #111;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        #messageInput {
+            background-color: #222;
+            color: #fff;
+            border: 1px solid #fff;
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 5px;
+            width: 250px;
+            transition: border-color 0.3s;
+        }
+        #messageInput:focus {
+            outline: none;
+            border-color: #00ccff;
+        }
+        button {
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #fff;
+            padding: 8px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-left: 10px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        button:hover {
+            background-color: #666;
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        #messageDisplay {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #fff;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="clock" width="400" height="400"></canvas>
+    <div class="controls">
+        <input type="text" id="messageInput" placeholder="Enter your message">
+        <button onclick="displayMessage()">Submit</button>
+    </div>
+    <div id="messageDisplay">
+        <span id="translatedMessage"></span><span id="currentLetterMorse"></span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('clock');
+        const ctx = canvas.getContext('2d');
+        const radius = canvas.width / 2;
+        ctx.translate(radius, radius); // Center the clock
+
+        // State variables
+        let messageMode = false;
+        let animationSchedule = [];
+        let completionTimesArray = [];
+        let messageStartTime = 0;
+        let eventIndex = 0;
+        let completionIndex = 0;
+        let currentLetterMorse = '';
+        let translatedMessage = '';
+
+        // Morse code mapping
+        const morseCode = {
+            'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 
+            'F': '..-.', 'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 
+            'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 
+            'P': '.--.', 'Q': '--.-', 'R': '.-.', 'S': '...', 'T': '-', 
+            'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-', 'Y': '-.--', 
+            'Z': '--..', '0': '-----', '1': '.----', '2': '..---', 
+            '3': '...--', '4': '....-', '5': '.....', '6': '-....', 
+            '7': '--...', '8': '---..', '9': '----.'
+        };
+
+        // Inverse mapping for translation
+        const morseToLetter = {};
+        for (let letter in morseCode) {
+            morseToLetter[morseCode[letter]] = letter;
+        }
+
+        // Convert message to Morse code
+        function convertToMorse(message) {
+            message = message.toUpperCase();
+            let morse = '';
+            for (let char of message) {
+                if (char === ' ') {
+                    morse += ' / ';
+                } else if (morseCode[char]) {
+                    morse += morseCode[char] + ' ';
+                }
+            }
+            return morse.trim();
+        }
+
+        // Build animation schedule and completion times
+        function buildAnimationSchedule(morse) {
+            const unit = 0.3; // 0.3 seconds per unit
+            let t = 0;
+            const schedule = [];
+            const completionTimes = [];
+            const letters = morse.split(' ');
+
+            for (let i = 0; i < letters.length; i++) {
+                const letter = letters[i];
+                if (letter === '/') {
+                    completionTimes.push({ time: t, type: 'word' });
+                    t += 7 * unit; // Word space: 7 units
+                    continue;
+                }
+                for (let j = 0; j < letter.length; j++) {
+                    const element = letter[j];
+                    if (element === '.') {
+                        schedule.push({ start: t, type: 'dot', duration: unit });
+                        t += unit + unit; // Dot duration + 1 unit space
+                    } else if (element === '-') {
+                        schedule.push({ start: t, type: 'dash', duration: 3 * unit });
+                        t += 3 * unit + unit; // Dash duration + 1 unit space
+                    }
+                }
+                completionTimes.push({ time: t - unit, type: 'letter' });
+                if (i < letters.length - 1 && letters[i + 1] !== '/') {
+                    t += 2 * unit; // Additional 2 units for 3-unit letter space
+                }
+            }
+            return { schedule, completionTimes, totalDuration: t };
+        }
+
+        // Start displaying the message
+        function displayMessage() {
+            const message = document.getElementById('messageInput').value;
+            if (!message) return;
+            // Clear previous display only when a new message is submitted
+            document.getElementById('translatedMessage').textContent = '';
+            document.getElementById('currentLetterMorse').textContent = '';
+            const morse = convertToMorse(message);
+            const { schedule, completionTimes, totalDuration } = buildAnimationSchedule(morse);
+            animationSchedule = schedule;
+            completionTimesArray = completionTimes;
+            messageMode = true;
+            messageStartTime = performance.now() / 1000;
+            eventIndex = 0;
+            completionIndex = 0;
+            currentLetterMorse = '';
+            translatedMessage = '';
+            setTimeout(() => {
+                messageMode = false;
+                animationSchedule = [];
+                completionTimesArray = [];
+            }, totalDuration * 1000);
+        }
+
+        // Calculate second hand angle during message mode
+        function getMessageSecondAngle(currentTime) {
+            const elapsed = currentTime - messageStartTime;
+            for (let event of animationSchedule) {
+                if (elapsed >= event.start && elapsed < event.start + event.duration) {
+                    const progress = (elapsed - event.start) / event.duration;
+                    const maxAngle = event.type === 'dot' ? 15 : 45; // Degrees
+                    if (progress < 0.5) {
+                        return maxAngle * (progress / 0.5);
+                    } else {
+                        return maxAngle * (1 - (progress - 0.5) / 0.5);
+                    }
+                }
+            }
+            return 0;
+        }
+
+        // Draw the clock and update message display
+        function drawClock() {
+            const now = new Date();
+            const hour = now.getHours() % 12;
+            const minute = now.getMinutes();
+            const second = now.getSeconds();
+
+            // Clear canvas
+            ctx.clearRect(-radius, -radius, canvas.width, canvas.height);
+
+            // Draw clock face
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.9, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw numbers
+            ctx.font = `${radius * 0.15}px 'Courier New', Courier, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            for (let num = 1; num <= 12; num++) {
+                const angle = (num * Math.PI) / 6 - Math.PI / 2;
+                const x = radius * 0.8 * Math.cos(angle);
+                const y = radius * 0.8 * Math.sin(angle);
+                ctx.fillText(num.toString(), x, y);
+            }
+
+            // Draw hour hand
+            const hourAngle = (hour + minute / 60) * Math.PI / 6 - Math.PI / 2;
+            ctx.save();
+            ctx.rotate(hourAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(radius * 0.5, 0);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            ctx.restore();
+
+            // Draw minute hand
+            const minuteAngle = (minute + second / 60) * Math.PI / 30 - Math.PI / 2;
+            ctx.save();
+            ctx.rotate(minuteAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(radius * 0.7, 0);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            ctx.restore();
+
+            // Draw second hand and handle message mode
+            let secondAngle;
+            if (messageMode) {
+                const currentTime = performance.now() / 1000;
+                secondAngle = (getMessageSecondAngle(currentTime) * Math.PI) / 180;
+                const elapsed = currentTime - messageStartTime;
+
+                // Process events (dots and dashes)
+                while (eventIndex < animationSchedule.length && elapsed >= animationSchedule[eventIndex].start) {
+                    const event = animationSchedule[eventIndex];
+                    if (event.type === 'dot') {
+                        currentLetterMorse += '.';
+                    } else if (event.type === 'dash') {
+                        currentLetterMorse += '-';
+                    }
+                    eventIndex++;
+                }
+
+                // Process completions (letters and words)
+                while (completionIndex < completionTimesArray.length && elapsed >= completionTimesArray[completionIndex].time) {
+                    const completion = completionTimesArray[completionIndex];
+                    if (completion.type === 'letter') {
+                        if (currentLetterMorse in morseToLetter) {
+                            translatedMessage += morseToLetter[currentLetterMorse];
+                        } else {
+                            translatedMessage += '?'; // Unknown Morse code
+                        }
+                        currentLetterMorse = '';
+                    } else if (completion.type === 'word') {
+                        translatedMessage += ' ';
+                    }
+                    completionIndex++;
+                }
+
+                // Update display in real time
+                document.getElementById('translatedMessage').textContent = translatedMessage;
+                document.getElementById('currentLetterMorse').textContent = currentLetterMorse ? ' ' + currentLetterMorse : '';
+            } else {
+                secondAngle = second * Math.PI / 30 - Math.PI / 2;
+                // Keep the display as is after transmission ends
+            }
+
+            ctx.save();
+            ctx.rotate(secondAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(radius * 0.85, 0);
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+
+            requestAnimationFrame(drawClock);
+        }
+
+        // Start the clock
+        requestAnimationFrame(drawClock);
+
+        // Add event listener for Enter key
+        document.getElementById('messageInput').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                displayMessage();
+            }
+        });
+    </script>
+</body>
+</html>
