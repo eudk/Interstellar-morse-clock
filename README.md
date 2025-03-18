@@ -2,7 +2,7 @@
 
 ![Clock Preview](pic.png) 
 
-**Inspired by *Interstellar***, this project reimagines the movie's clever use of a watch's second hand to transmit messages. In the film, binary data is communicated through subtle movements. Here, we’ve adapted that concept into an analog clock that transmits messages using Morse code!
+**Inspired by *Interstellar***, this project reimagines the movie's clever use of a watch's second hand to transmit messages. In the film, binary data is communicated through subtle movements. Here, we’ve adapted that concept into an analog clock that transmits messages using Morse code! Not associated with 
 
 ---
 ![Preview](preview.png) 
@@ -14,7 +14,7 @@ The **Interstellar Morse Code Clock** is a web app that merges a working analog 
 ---
 
 ## How to Use
-[Onilne version](https://eudk.github.io/Interstellar-Morse-Clock) 
+[Onilne version](https://eudk.github.io/Interstellar-morse-clock/watch.html) 
 1. **Launch the App**: Open the project in a web browser (see [Running the Project](#running-the-project)).
 2. **View the Clock**: An analog clock displays the current time.
 3. **Enter a Message**: Type something like "SOS" or "HELLO" (A-Z, 0-9 supported).
@@ -92,4 +92,5 @@ This project draws its concept from *Interstellar*, where a watch’s second han
 - Feel free to submit pull requests and improve it!
 
 ---
-Have fun with the Interstellar Morse Code Clock! Contributions and feedback are welcome.
+- Have fun with the Interstellar Morse Code Clock! Contributions and feedback are welcome.
+- Not affiliated with, endorsed by, or associated with Warner Bros. or the creators of *Interstellar*
